@@ -2,7 +2,7 @@
  * This class represents a square with a file path, number of lines of code, and complexity.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
- * @author Brandon Powell - GH Bpowell5186
+ * @author Brandon Powell - GH Bpowell5184
  * @version 1.2
  */
 public class Square {

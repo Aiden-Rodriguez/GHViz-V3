@@ -6,7 +6,7 @@ import java.awt.event.ActionListener;
  * Controller class to handle the action of loading a URL from the text field.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
- * @author Brandon Powell - GH Bpowell5186
+ * @author Brandon Powell - GH Bpowell5184
  * @version 1.2
  */
 public class Controller implements ActionListener {

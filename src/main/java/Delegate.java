@@ -8,7 +8,7 @@ import java.util.regex.Matcher;
  * Delegate class to load Java files from a GitHub repository URL.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
- * @author Brandon Powell - GH Bpowell5186
+ * @author Brandon Powell - GH Bpowell5184
  * @version 1.2
  */
 public class Delegate implements Runnable {

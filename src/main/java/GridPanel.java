@@ -9,7 +9,7 @@ import java.beans.PropertyChangeListener;
  * GridPanel class to display squares based on the Blackboard state.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
- * @author Brandon Powell - GH Bpowell5186
+ * @author Brandon Powell - GH Bpowell5184
  * @version 1.2
  */
 public class GridPanel extends JPanel implements PropertyChangeListener {

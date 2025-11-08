@@ -6,7 +6,7 @@ import java.util.Vector;
  * Blackboard class to manage squares and notify listeners about state changes.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
- * @author Brandon Powell - GH Bpowell5186
+ * @author Brandon Powell - GH Bpowell5184
  * @version 1.2
  */
 public class Blackboard extends PropertyChangeSupport {

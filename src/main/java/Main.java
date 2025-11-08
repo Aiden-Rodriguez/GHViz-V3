@@ -7,7 +7,7 @@ import java.beans.PropertyChangeListener;
  * Main class to set up the GUI for the GitHubViz application.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
- * @author Brandon Powell - GH Bpowell5186
+ * @author Brandon Powell - GH Bpowell5184
  * @version 1.2
  */
 public class Main extends JFrame implements PropertyChangeListener {
