@@ -33,11 +33,10 @@ public class Main extends JFrame implements PropertyChangeListener {
         GridPanel gridPanel = new GridPanel();
         tabbedPane.addTab("Grid", gridPanel);
 
-        JPanel metricsPanel = new JPanel();
-        metricsPanel.setBackground(Color.WHITE);
+        MetricsPanel metricsPanel = new MetricsPanel();
         tabbedPane.addTab("Metrics", metricsPanel);
 
-        // Diagram tab (placeholder/empty)
+        // Diagram tab (placeholder)
         JPanel diagramPanel = new JPanel();
         diagramPanel.setBackground(Color.WHITE);
         tabbedPane.addTab("Diagram", diagramPanel);
@@ -45,7 +44,6 @@ public class Main extends JFrame implements PropertyChangeListener {
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, fileTreePanel, tabbedPane);
         splitPane.setDividerLocation(250);
         splitPane.setResizeWeight(0.0);
-
         statusLabel = new JLabel(" Ready");
         statusLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
@@ -84,6 +82,7 @@ public class Main extends JFrame implements PropertyChangeListener {
         menuBar.add(helpMenu);
         setJMenuBar(menuBar);
 
+        // Layout
         setLayout(new BorderLayout());
         add(top, BorderLayout.NORTH);
         add(splitPane, BorderLayout.CENTER);

@@ -2,6 +2,8 @@ import java.beans.PropertyChangeSupport;
 import java.util.List;
 import java.util.Vector;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Blackboard class to manage squares and notify listeners about state changes.
@@ -47,9 +49,28 @@ public class Blackboard extends PropertyChangeSupport {
     }
 
     public void setReady() {
+        calculateAfferentDependencies();
         ready = true;
         loading = false;
         firePropertyChange("blackboardReady", false, true);
+    }
+
+    private void calculateAfferentDependencies() {
+        Map<String, Square> classMap = new HashMap<>();
+        for (Square square : squares) {
+            String className = square.getName().replace(".java", "");
+            classMap.put(className, square);
+        }
+
+        for (Square square : squares) {
+            String className = square.getName().replace(".java", "");
+            for (String dependency : square.getEfferentDependencies()) {
+                Square dependentSquare = classMap.get(dependency);
+                if (dependentSquare != null) {
+                    dependentSquare.addAfferentDependency(className);
+                }
+            }
+        }
     }
 
     public void setLoading(boolean loading) {
@@ -92,7 +113,8 @@ public class Blackboard extends PropertyChangeSupport {
         return squares;
     }
 
-    //Get filtered squares based on the currently selected folder path.
+     //Get filtered squares based on the currently selected folder path.
+
     public List<Square> getFilteredSquares() {
         if (selectedFolderPath == null || selectedFolderPath.isEmpty()) {
             return new Vector<>();
@@ -108,7 +130,6 @@ public class Blackboard extends PropertyChangeSupport {
                         if (remaining.startsWith("/")) {
                             remaining = remaining.substring(1);
                         }
-                        // Only include if there are no more slashes (file is directly in this folder)
                         return !remaining.contains("/");
                     }
                     return false;
