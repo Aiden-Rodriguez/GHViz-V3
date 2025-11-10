@@ -10,7 +10,7 @@ import java.beans.PropertyChangeListener;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.2
+ * @version 1.3
  */
 public class GridPanel extends JPanel implements PropertyChangeListener {
 
@@ -18,24 +18,50 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
     private boolean ready = false;
     private Square selectedSquare = null;
     private Square hoveredSquare = null;
+    private JPanel visualizationPanel;
+    private JTextField selectedFileField;
 
     public GridPanel() {
-        setBackground(Color.WHITE);
-        Blackboard.getInstance().addPropertyChangeListener(this);
+        setLayout(new BorderLayout());
 
-        addMouseListener(new MouseAdapter() {
+        visualizationPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (loading) {
+                    drawLoading(g);
+                } else if (ready) {
+                    drawSquares(g);
+                }
+            }
+        };
+        visualizationPanel.setBackground(Color.WHITE);
+
+        visualizationPanel.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 handleMouseClick(e.getX(), e.getY());
             }
         });
 
-        addMouseMotionListener(new MouseAdapter() {
+        visualizationPanel.addMouseMotionListener(new MouseAdapter() {
             @Override
             public void mouseMoved(MouseEvent e) {
                 handleMouseMove(e.getX(), e.getY());
             }
         });
+
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+        bottomPanel.add(new JLabel(" Selected File Name: "), BorderLayout.WEST);
+        selectedFileField = new JTextField();
+        selectedFileField.setEditable(false);
+        selectedFileField.setBackground(Color.WHITE);
+        bottomPanel.add(selectedFileField, BorderLayout.CENTER);
+
+        add(visualizationPanel, BorderLayout.CENTER);
+        add(bottomPanel, BorderLayout.SOUTH);
+
+        Blackboard.getInstance().addPropertyChangeListener(this);
     }
 
     @Override
@@ -49,28 +75,35 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
         } else if (evt.getPropertyName().equals("blackboardCleared")) {
             selectedSquare = null;
             hoveredSquare = null;
+            selectedFileField.setText("");
+        } else if (evt.getPropertyName().equals("selectedFileName")) {
+            selectedFileField.setText((String) evt.getNewValue());
+        } else if (evt.getPropertyName().equals("selectedFolderPath")) {
+            // When folder selection changes, clear the selected file
+            selectedSquare = null;
+            selectedFileField.setText("");
         }
-        repaint();
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        if (loading) {
-            drawLoading(g);
-        } else if (ready) {
-            drawSquares(g);
-        }
+        visualizationPanel.repaint();
     }
 
     private void drawSquares(Graphics g) {
-        java.util.List<Square> squares = Blackboard.getInstance().getSquares();
-        if (squares.isEmpty()) return;
+        java.util.List<Square> squares = Blackboard.getInstance().getFilteredSquares();
+        if (squares.isEmpty()) {
+            g.setColor(Color.GRAY);
+            g.setFont(new Font("Arial", Font.PLAIN, 14));
+            String message = "Select a folder from the tree to view files";
+            FontMetrics fm = g.getFontMetrics();
+            int messageWidth = fm.stringWidth(message);
+            g.drawString(message,
+                    (visualizationPanel.getWidth() - messageWidth) / 2,
+                    visualizationPanel.getHeight() / 2);
+            return;
+        }
 
         int cols = (int) Math.ceil(Math.sqrt(squares.size()));
         int rows = (int) Math.ceil((double) squares.size() / cols);
-        int squareWidth = getWidth() / cols;
-        int squareHeight = getHeight() / rows;
+        int squareWidth = visualizationPanel.getWidth() / cols;
+        int squareHeight = visualizationPanel.getHeight() / rows;
 
         int maxLines = squares.stream().mapToInt(Square::getLinesOfCode).max().orElse(1);
 
@@ -96,14 +129,13 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
                 g.setColor(Color.BLACK);
                 g.drawRect(x, y, squareWidth - 2, squareHeight - 2);
             }
-
         }
     }
 
     private void drawLoading(Graphics g) {
         g.setColor(Color.BLACK);
-        setFont(new Font("Arial", Font.PLAIN, 12));
-        g.drawString("Loading...", getWidth() / 2 - 30, getHeight() / 2);
+        g.setFont(new Font("Arial", Font.PLAIN, 12));
+        g.drawString("Loading...", visualizationPanel.getWidth() / 2 - 30, visualizationPanel.getHeight() / 2);
     }
 
     private Color calculateColor(int complexity, int lines, int maxLines) {
@@ -136,7 +168,7 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
         if (clickedSquare != null) {
             selectedSquare = clickedSquare;
             Blackboard.getInstance().setSelectedFileName(clickedSquare.getName());
-            repaint();
+            visualizationPanel.repaint();
         }
     }
 
@@ -149,21 +181,21 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
                         hoveredSquare.getName(),
                         hoveredSquare.getLinesOfCode(),
                         hoveredSquare.getComplexity());
-                setToolTipText(tooltip);
+                visualizationPanel.setToolTipText(tooltip);
             } else {
-                setToolTipText(null);
+                visualizationPanel.setToolTipText(null);
             }
         }
     }
 
     private Square getSquareAtPosition(int mouseX, int mouseY) {
-        java.util.List<Square> squares = Blackboard.getInstance().getSquares();
+        java.util.List<Square> squares = Blackboard.getInstance().getFilteredSquares();
         if (squares.isEmpty()) return null;
 
         int cols = (int) Math.ceil(Math.sqrt(squares.size()));
         int rows = (int) Math.ceil((double) squares.size() / cols);
-        int squareWidth = getWidth() / cols;
-        int squareHeight = getHeight() / rows;
+        int squareWidth = visualizationPanel.getWidth() / cols;
+        int squareHeight = visualizationPanel.getHeight() / rows;
 
         int col = mouseX / squareWidth;
         int row = mouseY / squareHeight;
@@ -174,5 +206,4 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
         }
         return null;
     }
-
 }

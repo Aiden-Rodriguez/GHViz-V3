@@ -8,19 +8,17 @@ import java.beans.PropertyChangeListener;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.2
+ * @version 1.3
  */
 public class Main extends JFrame implements PropertyChangeListener {
 
     private JTextField urlField;
-    private JTextField selectedFileField;
     private JLabel statusLabel;
     private Controller controller;
 
     public Main() {
         urlField = new JTextField();
         JButton okButton = new JButton("OK");
-        JPanel gridPanel = new GridPanel();
         controller = new Controller(urlField);
 
         JPanel top = new JPanel(new BorderLayout());
@@ -28,12 +26,25 @@ public class Main extends JFrame implements PropertyChangeListener {
         top.add(urlField, BorderLayout.CENTER);
         top.add(okButton, BorderLayout.EAST);
 
-        JPanel bottom = new JPanel(new BorderLayout());
-        bottom.add(new JLabel(" Selected File Name: "), BorderLayout.WEST);
-        selectedFileField = new JTextField();
-        selectedFileField.setEditable(false);
-        selectedFileField.setBackground(Color.WHITE);
-        bottom.add(selectedFileField, BorderLayout.CENTER);
+        FileTreePanel fileTreePanel = new FileTreePanel();
+
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        GridPanel gridPanel = new GridPanel();
+        tabbedPane.addTab("Grid", gridPanel);
+
+        JPanel metricsPanel = new JPanel();
+        metricsPanel.setBackground(Color.WHITE);
+        tabbedPane.addTab("Metrics", metricsPanel);
+
+        // Diagram tab (placeholder/empty)
+        JPanel diagramPanel = new JPanel();
+        diagramPanel.setBackground(Color.WHITE);
+        tabbedPane.addTab("Diagram", diagramPanel);
+
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, fileTreePanel, tabbedPane);
+        splitPane.setDividerLocation(250);
+        splitPane.setResizeWeight(0.0);
 
         statusLabel = new JLabel(" Ready");
         statusLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
@@ -75,13 +86,8 @@ public class Main extends JFrame implements PropertyChangeListener {
 
         setLayout(new BorderLayout());
         add(top, BorderLayout.NORTH);
-        add(gridPanel, BorderLayout.CENTER);
-        add(bottom, BorderLayout.SOUTH);
-
-        JPanel bottomContainer = new JPanel(new BorderLayout());
-        bottomContainer.add(bottom, BorderLayout.NORTH);
-        bottomContainer.add(statusLabel, BorderLayout.SOUTH);
-        add(bottomContainer, BorderLayout.SOUTH);
+        add(splitPane, BorderLayout.CENTER);
+        add(statusLabel, BorderLayout.SOUTH);
 
         okButton.addActionListener(controller);
         okButton.setActionCommand("OK");
@@ -91,12 +97,9 @@ public class Main extends JFrame implements PropertyChangeListener {
 
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
-        if (evt.getPropertyName().equals("selectedFileName")) {
-            selectedFileField.setText((String) evt.getNewValue());
-        } else if (evt.getPropertyName().equals("statusMessage")) {
+        if (evt.getPropertyName().equals("statusMessage")) {
             statusLabel.setText(" " + evt.getNewValue());
         } else if (evt.getPropertyName().equals("blackboardCleared")) {
-            selectedFileField.setText("");
             statusLabel.setText(" Ready");
         }
     }
@@ -104,11 +107,10 @@ public class Main extends JFrame implements PropertyChangeListener {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             Main main = new Main();
-            main.setTitle("Assignment 03");
-            main.setSize(800, 600);
+            main.setTitle("GitHub Code Visualizer");
+            main.setSize(1000, 600);
             main.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             main.setVisible(true);
         });
     }
-
 }
