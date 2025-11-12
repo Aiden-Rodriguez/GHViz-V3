@@ -100,12 +100,20 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
             return;
         }
 
+        java.util.List<Square> comparisonSquares;
+        if (squares.size() == 1) {
+            String filePath = squares.get(0).getPath();
+            comparisonSquares = Blackboard.getInstance().getSquaresInSameFolder(filePath);
+        } else {
+            comparisonSquares = squares;
+        }
+
         int cols = (int) Math.ceil(Math.sqrt(squares.size()));
         int rows = (int) Math.ceil((double) squares.size() / cols);
         int squareWidth = visualizationPanel.getWidth() / cols;
         int squareHeight = visualizationPanel.getHeight() / rows;
 
-        int maxLines = squares.stream().mapToInt(Square::getLinesOfCode).max().orElse(1);
+        int maxLines = comparisonSquares.stream().mapToInt(Square::getLinesOfCode).max().orElse(1);
 
         for (int i = 0; i < squares.size(); i++) {
             Square square = squares.get(i);
@@ -139,28 +147,20 @@ public class GridPanel extends JPanel implements PropertyChangeListener {
     }
 
     private Color calculateColor(int complexity, int lines, int maxLines) {
-        Color baseColor;
+        // Calculate percentage of max lines
+        double linePercentage = (maxLines > 0) ? (double) lines / maxLines : 0.0;
 
-        // Determine base color by complexity
-        if (complexity > 10) {
-            baseColor = new Color(240, 140, 140); // Red
-        } else if (complexity > 5) {
-            baseColor = new Color(255, 245, 150); // Yellow
+        // Determine color based on line count percentage
+        Color color;
+        if (linePercentage >= 2.0 / 3.0) {
+            color = new Color(240, 140, 140);
+        } else if (linePercentage >= 1.0 / 3.0) {
+            color = new Color(255, 245, 150);
         } else {
-            baseColor = new Color(180, 240, 180); // Green
+            color = new Color(180, 240, 180);
         }
 
-        // Calculate alpha based on lines
-        int alpha;
-        if (lines == 0) {
-            alpha = 0;
-        } else if (maxLines == 0) {
-            alpha = 255;
-        } else {
-            alpha = (int) (255.0 * lines / maxLines);
-        }
-
-        return new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), alpha);
+        return color;
     }
 
     private void handleMouseClick(int mouseX, int mouseY) {

@@ -35,8 +35,19 @@ public class Delegate implements Runnable {
 
             GitHubHandler gh = new GitHubHandler(token);
             List<String> allFromUrl = gh.listFilesRecursive(url);
+
+            // First pass: collect all class names from all Java files
+            Set<String> allProjectClasses = new HashSet<>();
+            for (String path : allFromUrl) {
+                if (path.endsWith(".java")) {
+                    String className = path.substring(path.lastIndexOf("/") + 1).replace(".java", "");
+                    allProjectClasses.add(className);
+                }
+            }
+
             int fileCount = 0;
 
+            // Second pass: analyze each file
             for (String path : allFromUrl) {
                 if (path.endsWith(".java")) {
                     String content = gh.getFileContentFromUrl(convertToBlobUrl(url, path));
@@ -47,7 +58,7 @@ public class Delegate implements Runnable {
                     square.setAbstract(isAbstractClass(content));
                     square.setInterface(isInterface(content));
 
-                    Set<String> dependencies = extractDependencies(content, path);
+                    Set<String> dependencies = extractDependencies(content, path, allProjectClasses);
                     for (String dep : dependencies) {
                         square.addEfferentDependency(dep);
                     }
@@ -98,93 +109,112 @@ public class Delegate implements Runnable {
     }
 
     private String removeCommentsAndStrings(String content) {
-        // Remove single-line comments
         content = content.replaceAll("//.*", "");
-
-        // Remove multi-line comments
         content = content.replaceAll("/\\*.*?\\*/", "");
-
-        // Remove string literals
         content = content.replaceAll("\".*?\"", "");
 
         return content;
     }
 
     private boolean isAbstractClass(String content) {
-        Pattern pattern = Pattern.compile("\\babstract\\s+class\\s+\\w+");
-        Matcher matcher = pattern.matcher(content);
+        String cleaned = removeCommentsAndStrings(content);
+
+        // Check if class declaration contains "abstract" keyword
+        Pattern pattern = Pattern.compile("\\b(public|private|protected)?\\s*abstract\\s+class\\s+\\w+");
+        Matcher matcher = pattern.matcher(cleaned);
         return matcher.find();
     }
 
     private boolean isInterface(String content) {
-        Pattern pattern = Pattern.compile("\\binterface\\s+\\w+");
-        Matcher matcher = pattern.matcher(content);
-        return matcher.find();
+        // Remove comments and strings to avoid false matches
+        String cleaned = removeCommentsAndStrings(content);
+        Pattern pattern = Pattern.compile("\\b(public|private|protected)?\\s*interface\\s+\\w+");
+        Matcher matcher = pattern.matcher(cleaned);
+
+        if (matcher.find()) {
+            int start = matcher.start();
+            String before = cleaned.substring(Math.max(0, start - 20), start);
+            if (before.contains("implements")) {
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 
-    private Set<String> extractDependencies(String content, String currentPath) {
+    private Set<String> extractDependencies(String content, String currentPath, Set<String> allProjectClasses) {
         Set<String> dependencies = new HashSet<>();
 
-        // Extract class name from path
         String currentClassName = currentPath.substring(currentPath.lastIndexOf("/") + 1).replace(".java", "");
 
-        // Extract import statements
-        Pattern importPattern = Pattern.compile("import\\s+[\\w.]+\\.(\\w+);");
-        Matcher importMatcher = importPattern.matcher(content);
-        while (importMatcher.find()) {
-            String importedClass = importMatcher.group(1);
-            // Only add if it's not a standard Java library
-            if (!isStandardJavaClass(importedClass)) {
-                dependencies.add(importedClass);
-            }
-        }
-
-        // Look for direct class usage (new ClassName(), ClassName.method(), etc.)
         String cleanedContent = removeCommentsAndStrings(content);
 
-        // Pattern for: new ClassName(
-        Pattern newPattern = Pattern.compile("\\bnew\\s+(\\w+)\\s*\\(");
+        Set<String> potentialClasses = new HashSet<>();
+
+        Pattern newPattern = Pattern.compile("\\bnew\\s+([A-Z]\\w+)\\s*[<(]");
         Matcher newMatcher = newPattern.matcher(cleanedContent);
         while (newMatcher.find()) {
-            String className = newMatcher.group(1);
-            if (!isStandardJavaClass(className) && !className.equals(currentClassName)) {
-                dependencies.add(className);
+            potentialClasses.add(newMatcher.group(1));
+        }
+
+        Pattern staticPattern = Pattern.compile("\\b([A-Z]\\w+)\\.\\w+\\s*\\(");
+        Matcher staticMatcher = staticPattern.matcher(cleanedContent);
+        while (staticMatcher.find()) {
+            potentialClasses.add(staticMatcher.group(1));
+        }
+
+        Pattern extendsPattern = Pattern.compile("\\bextends\\s+([A-Z]\\w+)");
+        Matcher extendsMatcher = extendsPattern.matcher(cleanedContent);
+        while (extendsMatcher.find()) {
+            potentialClasses.add(extendsMatcher.group(1));
+        }
+
+        Pattern implementsPattern = Pattern.compile("\\bimplements\\s+([A-Z][\\w,\\s]+)");
+        Matcher implementsMatcher = implementsPattern.matcher(cleanedContent);
+        while (implementsMatcher.find()) {
+            String interfaces = implementsMatcher.group(1);
+            for (String iface : interfaces.split(",")) {
+                String trimmed = iface.trim();
+                if (trimmed.matches("[A-Z]\\w+")) {
+                    potentialClasses.add(trimmed);
+                }
             }
         }
 
-        // Pattern for: ClassName.method() or ClassName.field
-        Pattern staticPattern = Pattern.compile("\\b([A-Z]\\w+)\\.\\w+");
-        Matcher staticMatcher = staticPattern.matcher(cleanedContent);
-        while (staticMatcher.find()) {
-            String className = staticMatcher.group(1);
-            if (!isStandardJavaClass(className) && !className.equals(currentClassName)) {
+        // Pattern for: ClassName varName (field/variable declarations)
+        // Matches: "ClassName varName;" or "ClassName varName =" or "ClassName varName)"
+        Pattern declPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+[a-z]\\w*\\s*[;=),]");
+        Matcher declMatcher = declPattern.matcher(cleanedContent);
+        while (declMatcher.find()) {
+            potentialClasses.add(declMatcher.group(1));
+        }
+
+        // Pattern for: method parameters - Type paramName
+        Pattern paramPattern = Pattern.compile("\\(([^)]*?)\\)");
+        Matcher paramMatcher = paramPattern.matcher(cleanedContent);
+        while (paramMatcher.find()) {
+            String params = paramMatcher.group(1);
+            Pattern typePattern = Pattern.compile("\\b([A-Z]\\w+)\\s+\\w+");
+            Matcher typeMatcher = typePattern.matcher(params);
+            while (typeMatcher.find()) {
+                potentialClasses.add(typeMatcher.group(1));
+            }
+        }
+
+        // Pattern for: return types - "ClassName methodName("
+        Pattern returnPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+\\w+\\s*\\(");
+        Matcher returnMatcher = returnPattern.matcher(cleanedContent);
+        while (returnMatcher.find()) {
+            potentialClasses.add(returnMatcher.group(1));
+        }
+
+        for (String className : potentialClasses) {
+            if (allProjectClasses.contains(className) && !className.equals(currentClassName)) {
                 dependencies.add(className);
             }
         }
 
         return dependencies;
-    }
-
-    private boolean isStandardJavaClass(String className) {
-        // Common Java standard library prefixes and classes
-        return className.startsWith("java") ||
-                className.startsWith("javax") ||
-                className.equals("String") ||
-                className.equals("Integer") ||
-                className.equals("Double") ||
-                className.equals("Boolean") ||
-                className.equals("List") ||
-                className.equals("Set") ||
-                className.equals("Map") ||
-                className.equals("ArrayList") ||
-                className.equals("HashMap") ||
-                className.equals("HashSet") ||
-                className.equals("Vector") ||
-                className.equals("Thread") ||
-                className.equals("Exception") ||
-                className.equals("Object") ||
-                className.equals("System") ||
-                className.equals("Math");
     }
 
     private String convertToBlobUrl(String url, String path) {

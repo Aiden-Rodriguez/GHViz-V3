@@ -113,7 +113,6 @@ public class Blackboard extends PropertyChangeSupport {
         return squares;
     }
 
-     //Get filtered squares based on the currently selected folder path.
 
     public List<Square> getFilteredSquares() {
         if (selectedFolderPath == null || selectedFolderPath.isEmpty()) {
@@ -123,16 +122,43 @@ public class Blackboard extends PropertyChangeSupport {
         return squares.stream()
                 .filter(square -> {
                     String squarePath = square.getPath();
-                    // Check if the square's path starts with the selected folder path
-                    // and is directly within that folder (not in a subfolder)
                     if (squarePath.startsWith(selectedFolderPath)) {
                         String remaining = squarePath.substring(selectedFolderPath.length());
                         if (remaining.startsWith("/")) {
                             remaining = remaining.substring(1);
                         }
+                        // Only include if there are no more slashes (i.e., file is directly in this folder)
                         return !remaining.contains("/");
                     }
                     return false;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get the folder path from a file path.
+     * Returns the parent folder of the file.
+     */
+    public String getFolderFromPath(String filePath) {
+        int lastSlash = filePath.lastIndexOf("/");
+        if (lastSlash > 0) {
+            return filePath.substring(0, lastSlash);
+        }
+        return "";
+    }
+
+    /**
+     * Get all squares in the same folder as the given file path.
+     * Used for comparing line counts when a single file is selected.
+     */
+    public List<Square> getSquaresInSameFolder(String filePath) {
+        String folderPath = getFolderFromPath(filePath);
+
+        return squares.stream()
+                .filter(square -> {
+                    String squarePath = square.getPath();
+                    String squareFolder = getFolderFromPath(squarePath);
+                    return squareFolder.equals(folderPath);
                 })
                 .collect(Collectors.toList());
     }

@@ -19,14 +19,14 @@ public class MetricsPanel extends JPanel implements PropertyChangeListener {
     private boolean loading = false;
     private boolean ready = false;
     private JPanel chartPanel;
-    private List<MetricPoint> metricPoints;
-    private MetricPoint hoveredPoint = null;
+    private List<Square> displayedSquares;
+    private Square hoveredSquare = null;
     private static final int MARGIN = 60;
     private static final int POINT_RADIUS = 8;
 
     public MetricsPanel() {
         setLayout(new BorderLayout());
-        metricPoints = new ArrayList<>();
+        displayedSquares = new ArrayList<>();
 
         chartPanel = new JPanel() {
             @Override
@@ -37,7 +37,7 @@ public class MetricsPanel extends JPanel implements PropertyChangeListener {
 
                 if (loading) {
                     drawLoading(g2d);
-                } else if (ready && !metricPoints.isEmpty()) {
+                } else if (ready && !displayedSquares.isEmpty()) {
                     drawChart(g2d);
                 } else {
                     drawEmptyMessage(g2d);
@@ -65,39 +65,19 @@ public class MetricsPanel extends JPanel implements PropertyChangeListener {
         } else if (evt.getPropertyName().equals("blackboardReady")) {
             loading = false;
             ready = true;
-            calculateMetrics();
+            updateDisplayedSquares();
         } else if (evt.getPropertyName().equals("blackboardCleared")) {
-            metricPoints.clear();
-            hoveredPoint = null;
+            displayedSquares.clear();
+            hoveredSquare = null;
         } else if (evt.getPropertyName().equals("selectedFolderPath")) {
-            calculateMetrics();
+            updateDisplayedSquares();
         }
         chartPanel.repaint();
     }
 
-    private void calculateMetrics() {
-        metricPoints.clear();
-        List<Square> squares = Blackboard.getInstance().getFilteredSquares();
-
-        for (Square square : squares) {
-            // Calculate Abstractness (A): 0 if concrete, 1 if abstract or interface
-            double abstractness = (square.isAbstract() || square.isInterface()) ? 1.0 : 0.0;
-
-            // Calculate Instability (I): Ce / (Ce + Ca)
-            // Ce = Efferent coupling (outgoing dependencies)
-            // Ca = Afferent coupling (incoming dependencies)
-            int ce = square.getEfferentCoupling();
-            int ca = square.getAfferentCoupling();
-            double instability = 0.0;
-            if (ce + ca > 0) {
-                instability = (double) ce / (ce + ca);
-            }
-
-            // Distance from main sequence: D = |A + I - 1|
-            double distance = Math.abs(abstractness + instability - 1.0);
-
-            metricPoints.add(new MetricPoint(square, abstractness, instability, distance));
-        }
+    private void updateDisplayedSquares() {
+        displayedSquares.clear();
+        displayedSquares.addAll(Blackboard.getInstance().getFilteredSquares());
     }
 
     private void drawChart(Graphics2D g2d) {
@@ -145,20 +125,32 @@ public class MetricsPanel extends JPanel implements PropertyChangeListener {
             g2d.drawString(yLabel, MARGIN - 30, y + 5);
         }
 
-        for (MetricPoint point : metricPoints) {
-            int px = MARGIN + (int) (point.instability * chartWidth);
-            int py = height - MARGIN - (int) (point.abstractness * chartHeight);
+        for (Square square : displayedSquares) {
+            // Calculate metrics for individual square
+            double abstractness = (square.isAbstract() || square.isInterface()) ? 1.0 : 0.0;
 
-            Color pointColor;
-            if (point.distance < 0.1) {
-                pointColor = new Color(100, 180, 100); // Green - good
-            } else if (point.distance < 0.3) {
-                pointColor = new Color(255, 200, 100); // Yellow - warning
-            } else {
-                pointColor = new Color(220, 100, 100); // Red - problematic
+            int ce = square.getEfferentCoupling();
+            int ca = square.getAfferentCoupling();
+            double instability = 0.0;
+            if (ce + ca > 0) {
+                instability = (double) ce / (ce + ca);
             }
 
-            if (point == hoveredPoint) {
+            double distance = Math.abs(abstractness + instability - 1.0);
+
+            int px = MARGIN + (int) (instability * chartWidth);
+            int py = height - MARGIN - (int) (abstractness * chartHeight);
+
+            Color pointColor;
+            if (distance < 0.1) {
+                pointColor = new Color(100, 180, 100);
+            } else if (distance < 0.3) {
+                pointColor = new Color(255, 200, 100);
+            } else {
+                pointColor = new Color(220, 100, 100);
+            }
+
+            if (square == hoveredSquare) {
                 g2d.setColor(Color.BLUE);
                 g2d.fillOval(px - POINT_RADIUS - 2, py - POINT_RADIUS - 2,
                         (POINT_RADIUS + 2) * 2, (POINT_RADIUS + 2) * 2);
@@ -195,49 +187,53 @@ public class MetricsPanel extends JPanel implements PropertyChangeListener {
         int chartWidth = width - 2 * MARGIN;
         int chartHeight = height - 2 * MARGIN;
 
-        MetricPoint newHovered = null;
-        for (MetricPoint point : metricPoints) {
-            int px = MARGIN + (int) (point.instability * chartWidth);
-            int py = height - MARGIN - (int) (point.abstractness * chartHeight);
+        Square newHovered = null;
+        for (Square square : displayedSquares) {
+            double abstractness = (square.isAbstract() || square.isInterface()) ? 1.0 : 0.0;
+
+            int ce = square.getEfferentCoupling();
+            int ca = square.getAfferentCoupling();
+            double instability = 0.0;
+            if (ce + ca > 0) {
+                instability = (double) ce / (ce + ca);
+            }
+
+            int px = MARGIN + (int) (instability * chartWidth);
+            int py = height - MARGIN - (int) (abstractness * chartHeight);
 
             double distance = Math.sqrt(Math.pow(mouseX - px, 2) + Math.pow(mouseY - py, 2));
             if (distance <= POINT_RADIUS + 2) {
-                newHovered = point;
+                newHovered = square;
                 break;
             }
         }
 
-        if (newHovered != hoveredPoint) {
-            hoveredPoint = newHovered;
-            if (hoveredPoint != null) {
+        if (newHovered != hoveredSquare) {
+            hoveredSquare = newHovered;
+            if (hoveredSquare != null) {
+                double abstractness = (hoveredSquare.isAbstract() || hoveredSquare.isInterface()) ? 1.0 : 0.0;
+                int ce = hoveredSquare.getEfferentCoupling();
+                int ca = hoveredSquare.getAfferentCoupling();
+                double instability = 0.0;
+                if (ce + ca > 0) {
+                    instability = (double) ce / (ce + ca);
+                }
+                double dist = Math.abs(abstractness + instability - 1.0);
+
                 String tooltip = String.format(
                         "<html><b>%s</b><br>Abstractness: %.2f<br>Instability: %.2f<br>Distance: %.2f<br>Ce: %d, Ca: %d</html>",
-                        hoveredPoint.square.getName(),
-                        hoveredPoint.abstractness,
-                        hoveredPoint.instability,
-                        hoveredPoint.distance,
-                        hoveredPoint.square.getEfferentCoupling(),
-                        hoveredPoint.square.getAfferentCoupling()
+                        hoveredSquare.getName(),
+                        abstractness,
+                        instability,
+                        dist,
+                        ce,
+                        ca
                 );
                 chartPanel.setToolTipText(tooltip);
             } else {
                 chartPanel.setToolTipText(null);
             }
             chartPanel.repaint();
-        }
-    }
-
-    private static class MetricPoint {
-        Square square;
-        double abstractness;
-        double instability;
-        double distance;
-
-        MetricPoint(Square square, double abstractness, double instability, double distance) {
-            this.square = square;
-            this.abstractness = abstractness;
-            this.instability = instability;
-            this.distance = distance;
         }
     }
 }
