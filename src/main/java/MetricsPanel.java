@@ -142,9 +142,9 @@ public class MetricsPanel extends JPanel implements PropertyChangeListener {
             int py = height - MARGIN - (int) (abstractness * chartHeight);
 
             Color pointColor;
-            if (distance < 0.1) {
+            if (distance < 0.3) {
                 pointColor = new Color(100, 180, 100);
-            } else if (distance < 0.3) {
+            } else if (distance < 0.5) {
                 pointColor = new Color(255, 200, 100);
             } else {
                 pointColor = new Color(220, 100, 100);

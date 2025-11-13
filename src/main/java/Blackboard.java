@@ -135,10 +135,6 @@ public class Blackboard extends PropertyChangeSupport {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get the folder path from a file path.
-     * Returns the parent folder of the file.
-     */
     public String getFolderFromPath(String filePath) {
         int lastSlash = filePath.lastIndexOf("/");
         if (lastSlash > 0) {
@@ -147,10 +143,6 @@ public class Blackboard extends PropertyChangeSupport {
         return "";
     }
 
-    /**
-     * Get all squares in the same folder as the given file path.
-     * Used for comparing line counts when a single file is selected.
-     */
     public List<Square> getSquaresInSameFolder(String filePath) {
         String folderPath = getFolderFromPath(filePath);
 

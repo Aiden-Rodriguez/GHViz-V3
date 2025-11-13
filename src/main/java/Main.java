@@ -82,7 +82,6 @@ public class Main extends JFrame implements PropertyChangeListener {
         menuBar.add(helpMenu);
         setJMenuBar(menuBar);
 
-        // Layout
         setLayout(new BorderLayout());
         add(top, BorderLayout.NORTH);
         add(splitPane, BorderLayout.CENTER);
