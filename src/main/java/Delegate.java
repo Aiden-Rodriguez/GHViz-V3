@@ -5,51 +5,73 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.util.Set;
 import java.util.HashSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Delegate class to load Java files from a GitHub repository URL.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.4
+ * @version 1.5
  */
 public class Delegate implements Runnable {
 
+    private static final Logger logger = LoggerFactory.getLogger(Delegate.class);
     private String url;
 
     public Delegate(String url) {
         this.url = url;
+        logger.debug("Delegate created for URL: {}", url);
     }
 
     @Override
     public void run() {
         Blackboard.getInstance().clear();
-        Blackboard.getInstance().setStatusMessage("Fetching...");
+        Blackboard.getInstance().setStatusMessage("Fetching repository contents...");
+        logger.info("Starting repository analysis for: {}", url);
+
         try {
             Dotenv dotenv = Dotenv.load();
             String token = dotenv.get("GITHUB_TOKEN");
 
             if (token == null || token.isEmpty()) {
+                logger.error("GitHub token not found in .env file");
                 throw new IllegalStateException("GitHub token not found in .env file");
             }
 
+            logger.debug("GitHub token loaded successfully");
             GitHubHandler gh = new GitHubHandler(token);
-            List<String> allFromUrl = gh.listFilesRecursive(url);
 
-            // First pass: collect all class names from all Java files
+            Blackboard.getInstance().setStatusMessage("Listing files...");
+            List<String> allFromUrl = gh.listFilesRecursive(url);
+            logger.info("Found {} total files in repository", allFromUrl.size());
+
+            // First pass: collect all class names
+            Blackboard.getInstance().setStatusMessage("Identifying Java files...");
             Set<String> allProjectClasses = new HashSet<>();
+            int javaFileCount = 0;
             for (String path : allFromUrl) {
                 if (path.endsWith(".java")) {
                     String className = path.substring(path.lastIndexOf("/") + 1).replace(".java", "");
                     allProjectClasses.add(className);
+                    javaFileCount++;
                 }
             }
+            logger.info("Found {} Java files", javaFileCount);
 
             int fileCount = 0;
 
             // Second pass: analyze each file
             for (String path : allFromUrl) {
                 if (path.endsWith(".java")) {
+                    fileCount++;
+                    Blackboard.getInstance().setStatusMessage(
+                            String.format("Analyzing file %d/%d: %s", fileCount, javaFileCount,
+                                    path.substring(path.lastIndexOf("/") + 1)));
+
+                    logger.debug("Analyzing file {}/{}: {}", fileCount, javaFileCount, path);
+
                     String content = gh.getFileContentFromUrl(convertToBlobUrl(url, path));
                     int lines = countNonEmptyLines(content);
                     int complexity = countComplexity(content);
@@ -62,30 +84,30 @@ public class Delegate implements Runnable {
                     String extendsClass = extractExtendsClass(content);
                     if (extendsClass != null && allProjectClasses.contains(extendsClass)) {
                         square.setExtendsClass(extendsClass);
+                        logger.debug("{} extends {}", path, extendsClass);
                     }
 
                     Set<String> implementsInterfaces = extractImplementsInterfaces(content);
                     for (String iface : implementsInterfaces) {
                         if (allProjectClasses.contains(iface)) {
                             square.addImplementsInterface(iface);
+                            logger.debug("{} implements {}", path, iface);
                         }
                     }
 
                     String currentClassName = path.substring(path.lastIndexOf("/") + 1).replace(".java", "");
 
-                    // Extract self-references (Singleton pattern) - should be aggregation
+                    // Extract relationships
                     Set<String> selfReferences = extractSelfReferences(content, currentClassName);
                     for (String selfRef : selfReferences) {
                         square.addAggregationDependency(selfRef);
                     }
 
-                    // Extract aggregation relationships (collections)
                     Set<String> aggregationTypes = extractAggregationTypes(content, allProjectClasses);
                     for (String aggrType : aggregationTypes) {
                         square.addAggregationDependency(aggrType);
                     }
 
-                    // Extract composition relationships (direct field references)
                     Set<String> fieldTypes = extractFieldTypes(content, allProjectClasses);
                     for (String fieldType : fieldTypes) {
                         if (!aggregationTypes.contains(fieldType) && !selfReferences.contains(fieldType)) {
@@ -93,21 +115,29 @@ public class Delegate implements Runnable {
                         }
                     }
 
-                    // Extract general dependencies (method parameters, local variables, etc.)
                     Set<String> dependencies = extractDependencies(content, path, allProjectClasses);
                     for (String dep : dependencies) {
                         square.addEfferentDependency(dep);
                     }
 
+                    logger.debug("File {} - Lines: {}, Complexity: {}, Dependencies: {}",
+                            currentClassName, lines, complexity, dependencies.size());
+
                     Blackboard.getInstance().addSquare(square);
-                    fileCount++;
                 }
             }
 
-            Blackboard.getInstance().setStatusMessage(fileCount + " files analyzed");
+            logger.info("Analysis complete - {} files processed", fileCount);
+            Blackboard.getInstance().setStatusMessage("Calculating metrics...");
             Blackboard.getInstance().setReady();
+            Blackboard.getInstance().setStatusMessage(fileCount + " files analyzed successfully");
             Thread.sleep(1000);
+
+        } catch (IllegalStateException e) {
+            logger.error("Configuration error: {}", e.getMessage());
+            Blackboard.getInstance().setStatusMessage("Error: " + e.getMessage());
         } catch (Exception e) {
+            logger.error("Error during repository analysis", e);
             Blackboard.getInstance().setStatusMessage("Error: " + e.getMessage());
             e.printStackTrace();
         }
@@ -122,7 +152,6 @@ public class Delegate implements Runnable {
 
     private int countComplexity(String content) {
         int complexity = 0;
-
         String cleaned = removeCommentsAndStrings(content);
 
         Pattern ifPattern = Pattern.compile("\\bif\\s*\\(");
@@ -148,7 +177,6 @@ public class Delegate implements Runnable {
         content = content.replaceAll("//.*", "");
         content = content.replaceAll("/\\*.*?\\*/", "");
         content = content.replaceAll("\".*?\"", "");
-
         return content;
     }
 
@@ -193,10 +221,8 @@ public class Delegate implements Runnable {
 
         while (matcher.find()) {
             String interfaceList = matcher.group(1);
-            // Split by comma and clean up
             for (String iface : interfaceList.split(",")) {
                 String trimmed = iface.trim();
-                // Remove any generic type parameters
                 if (trimmed.contains("<")) {
                     trimmed = trimmed.substring(0, trimmed.indexOf("<"));
                 }
@@ -212,19 +238,15 @@ public class Delegate implements Runnable {
         Set<String> fieldTypes = new HashSet<>();
         String cleaned = removeCommentsAndStrings(content);
 
-        // Collection type names to exclude
         Set<String> collectionTypes = Set.of("List", "Vector", "Set", "ArrayList",
                 "HashSet", "Collection", "Map", "HashMap",
                 "LinkedList", "TreeSet", "TreeMap");
 
-        // Look for field declarations: "private/public/protected Type fieldName"
         Pattern fieldPattern = Pattern.compile("\\b(private|public|protected)\\s+(?:static\\s+)?(?:final\\s+)?([A-Z]\\w+)(?:<[^>]+>)?\\s+\\w+\\s*[;=]");
         Matcher fieldMatcher = fieldPattern.matcher(cleaned);
 
         while (fieldMatcher.find()) {
             String type = fieldMatcher.group(2);
-            // Only add if it's a project class AND not a collection type
-            // Self-references are handled separately
             if (allProjectClasses.contains(type) && !collectionTypes.contains(type)) {
                 fieldTypes.add(type);
             }
@@ -237,7 +259,6 @@ public class Delegate implements Runnable {
         Set<String> selfRefs = new HashSet<>();
         String cleaned = removeCommentsAndStrings(content);
 
-        // Look for static fields of the same type (Singleton pattern)
         Pattern selfRefPattern = Pattern.compile("\\b(private|public|protected)\\s+static\\s+(?:final\\s+)?" +
                 currentClassName + "\\s+\\w+\\s*[;=]");
         Matcher matcher = selfRefPattern.matcher(cleaned);
@@ -253,7 +274,6 @@ public class Delegate implements Runnable {
         Set<String> aggregationTypes = new HashSet<>();
         String cleaned = removeCommentsAndStrings(content);
 
-        // Look for collection types with generics: List<Type>, Vector<Type>, Set<Type>, etc.
         Pattern collectionPattern = Pattern.compile("\\b(private|public|protected)\\s+(?:static\\s+)?(?:final\\s+)?(List|Vector|Set|ArrayList|HashSet|Collection|Map|HashMap|LinkedList|TreeSet|TreeMap)<\\s*([A-Z]\\w+)\\s*>");
         Matcher collectionMatcher = collectionPattern.matcher(cleaned);
 
@@ -269,11 +289,8 @@ public class Delegate implements Runnable {
 
     private Set<String> extractDependencies(String content, String currentPath, Set<String> allProjectClasses) {
         Set<String> dependencies = new HashSet<>();
-
         String currentClassName = currentPath.substring(currentPath.lastIndexOf("/") + 1).replace(".java", "");
-
         String cleanedContent = removeCommentsAndStrings(content);
-
         Set<String> potentialClasses = new HashSet<>();
 
         Pattern newPattern = Pattern.compile("\\bnew\\s+([A-Z]\\w+)\\s*[<(]");
@@ -288,14 +305,12 @@ public class Delegate implements Runnable {
             potentialClasses.add(staticMatcher.group(1));
         }
 
-        // Pattern for: ClassName varName (variable declarations)
         Pattern declPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+[a-z]\\w*\\s*[;=),]");
         Matcher declMatcher = declPattern.matcher(cleanedContent);
         while (declMatcher.find()) {
             potentialClasses.add(declMatcher.group(1));
         }
 
-        // Pattern for: method parameters - Type paramName
         Pattern paramPattern = Pattern.compile("\\(([^)]*?)\\)");
         Matcher paramMatcher = paramPattern.matcher(cleanedContent);
         while (paramMatcher.find()) {
@@ -307,7 +322,6 @@ public class Delegate implements Runnable {
             }
         }
 
-        // Pattern for: return types - "ClassName methodName("
         Pattern returnPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+\\w+\\s*\\(");
         Matcher returnMatcher = returnPattern.matcher(cleanedContent);
         while (returnMatcher.find()) {

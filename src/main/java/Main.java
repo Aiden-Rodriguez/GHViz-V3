@@ -2,21 +2,26 @@ import javax.swing.*;
 import java.awt.*;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Main class to set up the GUI for the GitHubViz application.
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.4
+ * @version 1.5
  */
 public class Main extends JFrame implements PropertyChangeListener {
 
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private JTextField urlField;
     private JLabel statusLabel;
     private Controller controller;
 
     public Main() {
+        logger.info("Initializing GitHub Code Visualizer application");
+
         urlField = new JTextField();
         JButton okButton = new JButton("OK");
         controller = new Controller(urlField);
@@ -27,21 +32,33 @@ public class Main extends JFrame implements PropertyChangeListener {
         top.add(okButton, BorderLayout.EAST);
 
         FileTreePanel fileTreePanel = new FileTreePanel();
+        logger.debug("FileTreePanel created");
 
         JTabbedPane tabbedPane = new JTabbedPane();
 
         GridPanel gridPanel = new GridPanel();
         tabbedPane.addTab("Grid", gridPanel);
+        logger.debug("GridPanel added to tabs");
 
         MetricsPanel metricsPanel = new MetricsPanel();
         tabbedPane.addTab("Metrics", metricsPanel);
+        logger.debug("MetricsPanel added to tabs");
 
         DiagramPanel diagramPanel = new DiagramPanel();
         tabbedPane.addTab("Diagram", diagramPanel);
+        logger.debug("DiagramPanel added to tabs");
+
+        tabbedPane.addChangeListener(e -> {
+            int selectedIndex = tabbedPane.getSelectedIndex();
+            String tabName = tabbedPane.getTitleAt(selectedIndex);
+            logger.debug("Switched to tab: {}", tabName);
+            Blackboard.getInstance().setStatusMessage("Viewing: " + tabName);
+        });
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, fileTreePanel, tabbedPane);
         splitPane.setDividerLocation(250);
         splitPane.setResizeWeight(0.0);
+
         statusLabel = new JLabel(" Ready");
         statusLabel.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
         statusLabel.setFont(new Font("Arial", Font.PLAIN, 11));
@@ -89,6 +106,8 @@ public class Main extends JFrame implements PropertyChangeListener {
         okButton.setActionCommand("OK");
 
         Blackboard.getInstance().addPropertyChangeListener(this);
+
+        logger.info("GUI initialization complete");
     }
 
     @Override
@@ -101,12 +120,24 @@ public class Main extends JFrame implements PropertyChangeListener {
     }
 
     public static void main(String[] args) {
+        logger.info("=== GitHub Code Visualizer Starting ===");
+
         SwingUtilities.invokeLater(() -> {
-            Main main = new Main();
-            main.setTitle("GitHub Code Visualizer");
-            main.setSize(1000, 600);
-            main.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            main.setVisible(true);
+            try {
+                Main main = new Main();
+                main.setTitle("GitHub Code Visualizer");
+                main.setSize(1000, 600);
+                main.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                main.setVisible(true);
+                logger.info("Application window displayed successfully");
+            } catch (Exception e) {
+                logger.error("Failed to start application", e);
+                JOptionPane.showMessageDialog(null,
+                        "Failed to start application: " + e.getMessage(),
+                        "Startup Error",
+                        JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
         });
     }
 }
