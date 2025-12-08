@@ -64,10 +64,10 @@ public class Controller implements ActionListener {
     }
 
     private void showAbout() {
-        String message = "Assignment 03\n" +
+        String message = "Assignment 04\n" +
                 "GitHub Repository Visualizer\n\n" +
                 "Authors: Aiden Rodriguez & Brandon Powell\n" +
-                "Version 1.2";
+                "Version 1.4";
         JOptionPane.showMessageDialog(null, message, "About", JOptionPane.INFORMATION_MESSAGE);
     }
 
