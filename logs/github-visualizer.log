@@ -1,0 +1,22 @@
+2025-12-07 21:01:15.541 [main] INFO  Main - === GitHub Code Visualizer Starting ===
+2025-12-07 21:01:15.752 [AWT-EventQueue-0] INFO  Main - Initializing GitHub Code Visualizer application
+2025-12-07 21:01:15.765 [AWT-EventQueue-0] INFO  Controller - Controller initialized
+2025-12-07 21:01:15.800 [AWT-EventQueue-0] INFO  Blackboard - Blackboard initialized
+2025-12-07 21:01:15.849 [AWT-EventQueue-0] INFO  Main - GUI initialization complete
+2025-12-07 21:01:15.897 [AWT-EventQueue-0] INFO  Main - Application window displayed successfully
+2025-12-07 21:01:19.357 [AWT-EventQueue-0] INFO  Blackboard - Status: Viewing: Metrics
+2025-12-07 21:01:21.989 [AWT-EventQueue-0] INFO  Blackboard - Status: Viewing: Diagram
+2025-12-07 21:01:22.491 [AWT-EventQueue-0] INFO  Blackboard - Status: Viewing: Metrics
+2025-12-07 21:01:23.113 [AWT-EventQueue-0] INFO  Blackboard - Status: Viewing: Grid
+2025-12-07 21:01:23.705 [AWT-EventQueue-0] INFO  Blackboard - Status: Viewing: Metrics
+2025-12-07 21:01:24.056 [AWT-EventQueue-0] INFO  Blackboard - Status: Viewing: Diagram
+2025-12-07 21:01:27.292 [AWT-EventQueue-0] WARN  Controller - Attempted to load empty URL
+2025-12-07 21:01:27.293 [AWT-EventQueue-0] INFO  Blackboard - Status: Error: No URL provided
+2025-12-07 21:01:30.920 [AWT-EventQueue-0] INFO  Blackboard - Status: About dialog opened
+2025-12-07 21:01:36.737 [AWT-EventQueue-0] INFO  Blackboard - Status: Ready
+2025-12-07 21:02:06.461 [main] INFO  Main - === GitHub Code Visualizer Starting ===
+2025-12-07 21:02:06.675 [AWT-EventQueue-0] INFO  Main - Initializing GitHub Code Visualizer application
+2025-12-07 21:02:06.688 [AWT-EventQueue-0] INFO  Controller - Controller initialized
+2025-12-07 21:02:06.723 [AWT-EventQueue-0] INFO  Blackboard - Blackboard initialized
+2025-12-07 21:02:06.779 [AWT-EventQueue-0] INFO  Main - GUI initialization complete
+2025-12-07 21:02:06.832 [AWT-EventQueue-0] INFO  Main - Application window displayed successfully
