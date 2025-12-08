@@ -10,7 +10,7 @@ import java.beans.PropertyChangeListener;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.3
+ * @version 1.4
  */
 public class GridPanel extends JPanel implements PropertyChangeListener {
 

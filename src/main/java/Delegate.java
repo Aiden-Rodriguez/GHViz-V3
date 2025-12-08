@@ -11,7 +11,7 @@ import java.util.HashSet;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.3
+ * @version 1.4
  */
 public class Delegate implements Runnable {
 
@@ -58,6 +58,42 @@ public class Delegate implements Runnable {
                     square.setAbstract(isAbstractClass(content));
                     square.setInterface(isInterface(content));
 
+                    // Extract extends and implements relationships
+                    String extendsClass = extractExtendsClass(content);
+                    if (extendsClass != null && allProjectClasses.contains(extendsClass)) {
+                        square.setExtendsClass(extendsClass);
+                    }
+
+                    Set<String> implementsInterfaces = extractImplementsInterfaces(content);
+                    for (String iface : implementsInterfaces) {
+                        if (allProjectClasses.contains(iface)) {
+                            square.addImplementsInterface(iface);
+                        }
+                    }
+
+                    String currentClassName = path.substring(path.lastIndexOf("/") + 1).replace(".java", "");
+
+                    // Extract self-references (Singleton pattern) - should be aggregation
+                    Set<String> selfReferences = extractSelfReferences(content, currentClassName);
+                    for (String selfRef : selfReferences) {
+                        square.addAggregationDependency(selfRef);
+                    }
+
+                    // Extract aggregation relationships (collections)
+                    Set<String> aggregationTypes = extractAggregationTypes(content, allProjectClasses);
+                    for (String aggrType : aggregationTypes) {
+                        square.addAggregationDependency(aggrType);
+                    }
+
+                    // Extract composition relationships (direct field references)
+                    Set<String> fieldTypes = extractFieldTypes(content, allProjectClasses);
+                    for (String fieldType : fieldTypes) {
+                        if (!aggregationTypes.contains(fieldType) && !selfReferences.contains(fieldType)) {
+                            square.addCompositionDependency(fieldType);
+                        }
+                    }
+
+                    // Extract general dependencies (method parameters, local variables, etc.)
                     Set<String> dependencies = extractDependencies(content, path, allProjectClasses);
                     for (String dep : dependencies) {
                         square.addEfferentDependency(dep);
@@ -118,15 +154,12 @@ public class Delegate implements Runnable {
 
     private boolean isAbstractClass(String content) {
         String cleaned = removeCommentsAndStrings(content);
-
-        // Check if class declaration contains "abstract" keyword
         Pattern pattern = Pattern.compile("\\b(public|private|protected)?\\s*abstract\\s+class\\s+\\w+");
         Matcher matcher = pattern.matcher(cleaned);
         return matcher.find();
     }
 
     private boolean isInterface(String content) {
-        // Remove comments and strings to avoid false matches
         String cleaned = removeCommentsAndStrings(content);
         Pattern pattern = Pattern.compile("\\b(public|private|protected)?\\s*interface\\s+\\w+");
         Matcher matcher = pattern.matcher(cleaned);
@@ -140,6 +173,98 @@ public class Delegate implements Runnable {
             return true;
         }
         return false;
+    }
+
+    private String extractExtendsClass(String content) {
+        String cleaned = removeCommentsAndStrings(content);
+        Pattern pattern = Pattern.compile("\\bextends\\s+([A-Z]\\w+)");
+        Matcher matcher = pattern.matcher(cleaned);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
+    }
+
+    private Set<String> extractImplementsInterfaces(String content) {
+        Set<String> interfaces = new HashSet<>();
+        String cleaned = removeCommentsAndStrings(content);
+        Pattern pattern = Pattern.compile("\\bimplements\\s+([A-Z][\\w,\\s]+)");
+        Matcher matcher = pattern.matcher(cleaned);
+
+        while (matcher.find()) {
+            String interfaceList = matcher.group(1);
+            // Split by comma and clean up
+            for (String iface : interfaceList.split(",")) {
+                String trimmed = iface.trim();
+                // Remove any generic type parameters
+                if (trimmed.contains("<")) {
+                    trimmed = trimmed.substring(0, trimmed.indexOf("<"));
+                }
+                if (trimmed.matches("[A-Z]\\w+")) {
+                    interfaces.add(trimmed);
+                }
+            }
+        }
+        return interfaces;
+    }
+
+    private Set<String> extractFieldTypes(String content, Set<String> allProjectClasses) {
+        Set<String> fieldTypes = new HashSet<>();
+        String cleaned = removeCommentsAndStrings(content);
+
+        // Collection type names to exclude
+        Set<String> collectionTypes = Set.of("List", "Vector", "Set", "ArrayList",
+                "HashSet", "Collection", "Map", "HashMap",
+                "LinkedList", "TreeSet", "TreeMap");
+
+        // Look for field declarations: "private/public/protected Type fieldName"
+        Pattern fieldPattern = Pattern.compile("\\b(private|public|protected)\\s+(?:static\\s+)?(?:final\\s+)?([A-Z]\\w+)(?:<[^>]+>)?\\s+\\w+\\s*[;=]");
+        Matcher fieldMatcher = fieldPattern.matcher(cleaned);
+
+        while (fieldMatcher.find()) {
+            String type = fieldMatcher.group(2);
+            // Only add if it's a project class AND not a collection type
+            // Self-references are handled separately
+            if (allProjectClasses.contains(type) && !collectionTypes.contains(type)) {
+                fieldTypes.add(type);
+            }
+        }
+
+        return fieldTypes;
+    }
+
+    private Set<String> extractSelfReferences(String content, String currentClassName) {
+        Set<String> selfRefs = new HashSet<>();
+        String cleaned = removeCommentsAndStrings(content);
+
+        // Look for static fields of the same type (Singleton pattern)
+        Pattern selfRefPattern = Pattern.compile("\\b(private|public|protected)\\s+static\\s+(?:final\\s+)?" +
+                currentClassName + "\\s+\\w+\\s*[;=]");
+        Matcher matcher = selfRefPattern.matcher(cleaned);
+
+        if (matcher.find()) {
+            selfRefs.add(currentClassName);
+        }
+
+        return selfRefs;
+    }
+
+    private Set<String> extractAggregationTypes(String content, Set<String> allProjectClasses) {
+        Set<String> aggregationTypes = new HashSet<>();
+        String cleaned = removeCommentsAndStrings(content);
+
+        // Look for collection types with generics: List<Type>, Vector<Type>, Set<Type>, etc.
+        Pattern collectionPattern = Pattern.compile("\\b(private|public|protected)\\s+(?:static\\s+)?(?:final\\s+)?(List|Vector|Set|ArrayList|HashSet|Collection|Map|HashMap|LinkedList|TreeSet|TreeMap)<\\s*([A-Z]\\w+)\\s*>");
+        Matcher collectionMatcher = collectionPattern.matcher(cleaned);
+
+        while (collectionMatcher.find()) {
+            String type = collectionMatcher.group(3);
+            if (allProjectClasses.contains(type)) {
+                aggregationTypes.add(type);
+            }
+        }
+
+        return aggregationTypes;
     }
 
     private Set<String> extractDependencies(String content, String currentPath, Set<String> allProjectClasses) {
@@ -163,26 +288,7 @@ public class Delegate implements Runnable {
             potentialClasses.add(staticMatcher.group(1));
         }
 
-        Pattern extendsPattern = Pattern.compile("\\bextends\\s+([A-Z]\\w+)");
-        Matcher extendsMatcher = extendsPattern.matcher(cleanedContent);
-        while (extendsMatcher.find()) {
-            potentialClasses.add(extendsMatcher.group(1));
-        }
-
-        Pattern implementsPattern = Pattern.compile("\\bimplements\\s+([A-Z][\\w,\\s]+)");
-        Matcher implementsMatcher = implementsPattern.matcher(cleanedContent);
-        while (implementsMatcher.find()) {
-            String interfaces = implementsMatcher.group(1);
-            for (String iface : interfaces.split(",")) {
-                String trimmed = iface.trim();
-                if (trimmed.matches("[A-Z]\\w+")) {
-                    potentialClasses.add(trimmed);
-                }
-            }
-        }
-
-        // Pattern for: ClassName varName (field/variable declarations)
-        // Matches: "ClassName varName;" or "ClassName varName =" or "ClassName varName)"
+        // Pattern for: ClassName varName (variable declarations)
         Pattern declPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+[a-z]\\w*\\s*[;=),]");
         Matcher declMatcher = declPattern.matcher(cleanedContent);
         while (declMatcher.find()) {

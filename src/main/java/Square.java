@@ -6,7 +6,7 @@ import java.util.Set;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.3
+ * @version 1.4
  */
 public class Square {
 
@@ -15,8 +15,17 @@ public class Square {
     private int complexity;
     private boolean isAbstract;
     private boolean isInterface;
-    private Set<String> efferentDependencies; // Classes this class depends on
-    private Set<String> afferentDependencies; // Classes that depend on this class
+
+    private String extendsClass;
+    private Set<String> implementsInterfaces;
+
+    // Composition and Aggregation
+    private Set<String> compositionDependencies;
+    private Set<String> aggregationDependencies;
+
+    // General dependencies
+    private Set<String> efferentDependencies;
+    private Set<String> afferentDependencies;
 
     public Square(String path, int lines, int complexity) {
         this.path = path;
@@ -24,6 +33,10 @@ public class Square {
         this.complexity = complexity;
         this.isAbstract = false;
         this.isInterface = false;
+        this.extendsClass = null;
+        this.implementsInterfaces = new HashSet<>();
+        this.compositionDependencies = new HashSet<>();
+        this.aggregationDependencies = new HashSet<>();
         this.efferentDependencies = new HashSet<>();
         this.afferentDependencies = new HashSet<>();
     }
@@ -58,6 +71,38 @@ public class Square {
 
     public void setInterface(boolean isInterface) {
         this.isInterface = isInterface;
+    }
+
+    public String getExtendsClass() {
+        return extendsClass;
+    }
+
+    public void setExtendsClass(String extendsClass) {
+        this.extendsClass = extendsClass;
+    }
+
+    public Set<String> getImplementsInterfaces() {
+        return implementsInterfaces;
+    }
+
+    public void addImplementsInterface(String interfaceName) {
+        implementsInterfaces.add(interfaceName);
+    }
+
+    public Set<String> getCompositionDependencies() {
+        return compositionDependencies;
+    }
+
+    public void addCompositionDependency(String className) {
+        compositionDependencies.add(className);
+    }
+
+    public Set<String> getAggregationDependencies() {
+        return aggregationDependencies;
+    }
+
+    public void addAggregationDependency(String className) {
+        aggregationDependencies.add(className);
     }
 
     public Set<String> getEfferentDependencies() {

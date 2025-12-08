@@ -7,7 +7,7 @@ import java.awt.event.ActionListener;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.2
+ * @version 1.4
  */
 public class Controller implements ActionListener {
 

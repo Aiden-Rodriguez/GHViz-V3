@@ -8,7 +8,7 @@ import java.beans.PropertyChangeListener;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.3
+ * @version 1.4
  */
 public class Main extends JFrame implements PropertyChangeListener {
 
@@ -36,9 +36,7 @@ public class Main extends JFrame implements PropertyChangeListener {
         MetricsPanel metricsPanel = new MetricsPanel();
         tabbedPane.addTab("Metrics", metricsPanel);
 
-        // Diagram tab (placeholder)
-        JPanel diagramPanel = new JPanel();
-        diagramPanel.setBackground(Color.WHITE);
+        DiagramPanel diagramPanel = new DiagramPanel();
         tabbedPane.addTab("Diagram", diagramPanel);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, fileTreePanel, tabbedPane);
