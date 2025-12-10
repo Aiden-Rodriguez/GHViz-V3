@@ -9,7 +9,7 @@ import java.util.HashMap;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.4
+ * @version 1.6
  */
 public class PlantUmlGenerator {
 
@@ -51,6 +51,7 @@ public class PlantUmlGenerator {
         for (Square square : squares) {
             String className = square.getName().replace(".java", "");
 
+            // 1. Inheritance (extends) - highest priority
             String extendsClass = square.getExtendsClass();
             if (extendsClass != null && classNames.contains(extendsClass)) {
                 String key = className + "--|>" + extendsClass;
@@ -60,6 +61,7 @@ public class PlantUmlGenerator {
                 }
             }
 
+            // 2. Interface implementation (implements)
             for (String interfaceName : square.getImplementsInterfaces()) {
                 if (classNames.contains(interfaceName)) {
                     String key = className + "..|>" + interfaceName;
@@ -70,40 +72,37 @@ public class PlantUmlGenerator {
                 }
             }
 
-            for (String compositionType : square.getCompositionDependencies()) {
-                if (classNames.contains(compositionType)) {
-                    String key = className + "*--" + compositionType;
-                    String reverseKey = compositionType + "*--" + className;
-                    if (!addedRelationships.contains(key) &&
-                            !addedRelationships.contains(reverseKey) &&
-                            !compositionType.equals(extendsClass) &&
-                            !square.getImplementsInterfaces().contains(compositionType)) {
-                        puml.append(className).append(" *-- ").append(compositionType).append("\n");
-                        addedRelationships.add(key);
-                    }
-                }
-            }
-
-            for (String aggregationType : square.getAggregationDependencies()) {
-                if (classNames.contains(aggregationType)) {
-                    String key = className + "o--" + aggregationType;
-                    String reverseKey = aggregationType + "o--" + className;
-                    if (!addedRelationships.contains(key) &&
-                            !addedRelationships.contains(reverseKey) &&
-                            !aggregationType.equals(extendsClass) &&
-                            !square.getImplementsInterfaces().contains(aggregationType)) {
-                        puml.append(className).append(" o-- ").append(aggregationType).append("\n");
-                        addedRelationships.add(key);
-                    }
-                }
-            }
-
             Set<String> alreadyShown = new HashSet<>();
             if (extendsClass != null) alreadyShown.add(extendsClass);
             alreadyShown.addAll(square.getImplementsInterfaces());
-            alreadyShown.addAll(square.getCompositionDependencies());
-            alreadyShown.addAll(square.getAggregationDependencies());
 
+            // 3. Composition (*--) - field declarations (non-collection)
+            for (String compositionType : square.getCompositionDependencies()) {
+                if (classNames.contains(compositionType) && !alreadyShown.contains(compositionType)) {
+                    String key = className + "*--" + compositionType;
+                    String reverseKey = compositionType + "*--" + className;
+                    if (!addedRelationships.contains(key) && !addedRelationships.contains(reverseKey)) {
+                        puml.append(className).append(" *-- ").append(compositionType).append("\n");
+                        addedRelationships.add(key);
+                        alreadyShown.add(compositionType);
+                    }
+                }
+            }
+
+            // 4. Aggregation (o--) - collection fields or self-references
+            for (String aggregationType : square.getAggregationDependencies()) {
+                if (classNames.contains(aggregationType) && !alreadyShown.contains(aggregationType)) {
+                    String key = className + "o--" + aggregationType;
+                    String reverseKey = aggregationType + "o--" + className;
+                    if (!addedRelationships.contains(key) && !addedRelationships.contains(reverseKey)) {
+                        puml.append(className).append(" o-- ").append(aggregationType).append("\n");
+                        addedRelationships.add(key);
+                        alreadyShown.add(aggregationType);
+                    }
+                }
+            }
+
+            // 5. General dependencies (-->) - uses relationships
             for (String dependency : square.getEfferentDependencies()) {
                 if (classNames.contains(dependency) && !alreadyShown.contains(dependency)) {
                     String key = className + "-->" + dependency;

@@ -13,7 +13,7 @@ import org.slf4j.LoggerFactory;
  *
  * @author Aiden Rodriguez - GH Aiden-Rodriguez
  * @author Brandon Powell - GH Bpowell5184
- * @version 1.5
+ * @version 1.6
  */
 public class Delegate implements Runnable {
 
@@ -242,12 +242,32 @@ public class Delegate implements Runnable {
                 "HashSet", "Collection", "Map", "HashMap",
                 "LinkedList", "TreeSet", "TreeMap");
 
-        Pattern fieldPattern = Pattern.compile("\\b(private|public|protected)\\s+(?:static\\s+)?(?:final\\s+)?([A-Z]\\w+)(?:<[^>]+>)?\\s+\\w+\\s*[;=]");
-        Matcher fieldMatcher = fieldPattern.matcher(cleaned);
+        String withoutMethodBodies = removeMethodBodies(cleaned);
+
+        Pattern fieldPattern = Pattern.compile(
+                "\\b(private|public|protected)\\s+" +
+                        "(?:static\\s+)?" +
+                        "(?:final\\s+)?" +
+                        "([A-Z]\\w+)" +
+                        "(?:<[^>]+>)?\\s+" +
+                        "\\w+\\s*" +
+                        "(?:=[^;]+)?;"
+        );
+        Matcher fieldMatcher = fieldPattern.matcher(withoutMethodBodies);
 
         while (fieldMatcher.find()) {
+            String fullMatch = fieldMatcher.group(0);
             String type = fieldMatcher.group(2);
-            if (allProjectClasses.contains(type) && !collectionTypes.contains(type)) {
+
+            if (collectionTypes.contains(type)) {
+                continue;
+            }
+
+            if (fullMatch.contains("= null")) {
+                continue;
+            }
+
+            if (allProjectClasses.contains(type)) {
                 fieldTypes.add(type);
             }
         }
@@ -255,13 +275,46 @@ public class Delegate implements Runnable {
         return fieldTypes;
     }
 
+    private String removeMethodBodies(String content) {
+        StringBuilder result = new StringBuilder();
+        int braceDepth = 0;
+        boolean inClassBody = false;
+
+        for (int i = 0; i < content.length(); i++) {
+            char c = content.charAt(i);
+
+            if (c == '{') {
+                if (braceDepth == 0) {
+                    inClassBody = true;
+                    result.append(c);
+                }
+                braceDepth++;
+            } else if (c == '}') {
+                braceDepth--;
+                if (braceDepth == 0 && inClassBody) {
+                    result.append(c);
+                }
+            } else if (braceDepth <= 1) {
+                result.append(c);
+            }
+        }
+
+        return result.toString();
+    }
+
     private Set<String> extractSelfReferences(String content, String currentClassName) {
         Set<String> selfRefs = new HashSet<>();
         String cleaned = removeCommentsAndStrings(content);
 
-        Pattern selfRefPattern = Pattern.compile("\\b(private|public|protected)\\s+static\\s+(?:final\\s+)?" +
-                currentClassName + "\\s+\\w+\\s*[;=]");
-        Matcher matcher = selfRefPattern.matcher(cleaned);
+        // Look for static fields of the same type (Singleton pattern)
+        // Must be a field declaration, not a local variable
+        String withoutMethodBodies = removeMethodBodies(cleaned);
+
+        Pattern selfRefPattern = Pattern.compile(
+                "\\b(private|public|protected)\\s+static\\s+(?:final\\s+)?" +
+                        currentClassName + "\\s+\\w+\\s*[;=]"
+        );
+        Matcher matcher = selfRefPattern.matcher(withoutMethodBodies);
 
         if (matcher.find()) {
             selfRefs.add(currentClassName);
@@ -274,8 +327,17 @@ public class Delegate implements Runnable {
         Set<String> aggregationTypes = new HashSet<>();
         String cleaned = removeCommentsAndStrings(content);
 
-        Pattern collectionPattern = Pattern.compile("\\b(private|public|protected)\\s+(?:static\\s+)?(?:final\\s+)?(List|Vector|Set|ArrayList|HashSet|Collection|Map|HashMap|LinkedList|TreeSet|TreeMap)<\\s*([A-Z]\\w+)\\s*>");
-        Matcher collectionMatcher = collectionPattern.matcher(cleaned);
+        String withoutMethodBodies = removeMethodBodies(cleaned);
+
+        // Look for collection types with generics: List<Type>, Vector<Type>, Set<Type>, etc.
+        Pattern collectionPattern = Pattern.compile(
+                "\\b(private|public|protected)\\s+" +
+                        "(?:static\\s+)?" +
+                        "(?:final\\s+)?" +
+                        "(List|Vector|Set|ArrayList|HashSet|Collection|Map|HashMap|LinkedList|TreeSet|TreeMap)" +
+                        "<\\s*([A-Z]\\w+)\\s*>"
+        );
+        Matcher collectionMatcher = collectionPattern.matcher(withoutMethodBodies);
 
         while (collectionMatcher.find()) {
             String type = collectionMatcher.group(3);
@@ -305,12 +367,14 @@ public class Delegate implements Runnable {
             potentialClasses.add(staticMatcher.group(1));
         }
 
+        // Pattern for: ClassName varName (variable declarations)
         Pattern declPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+[a-z]\\w*\\s*[;=),]");
         Matcher declMatcher = declPattern.matcher(cleanedContent);
         while (declMatcher.find()) {
             potentialClasses.add(declMatcher.group(1));
         }
 
+        // Pattern for: method parameters - Type paramName
         Pattern paramPattern = Pattern.compile("\\(([^)]*?)\\)");
         Matcher paramMatcher = paramPattern.matcher(cleanedContent);
         while (paramMatcher.find()) {
@@ -322,6 +386,7 @@ public class Delegate implements Runnable {
             }
         }
 
+        // Pattern for: return types - "ClassName methodName("
         Pattern returnPattern = Pattern.compile("\\b([A-Z]\\w+)\\s+\\w+\\s*\\(");
         Matcher returnMatcher = returnPattern.matcher(cleanedContent);
         while (returnMatcher.find()) {
