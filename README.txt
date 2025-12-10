@@ -1,4 +1,4 @@
-Welcome to our Assignment 4!
+Welcome to our Assignment 4! (By Aiden Rodriguez and Brandon Powell)
 
 The program should be easy to run from main. Make sure to add a github token to a .env file in the root directory.
 
